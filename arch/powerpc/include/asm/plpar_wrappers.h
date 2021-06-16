@@ -7,9 +7,11 @@
 #include <linux/string.h>
 #include <linux/irqflags.h>
 
+#include <asm/bug.h>
 #include <asm/hvcall.h>
 #include <asm/paca.h>
 #include <asm/page.h>
+#include <asm/reg.h>
 
 static inline void cede_processor(void)
 {
@@ -21,6 +23,11 @@ static inline void cede_processor(void)
 	 */
 	hvrc = plpar_hcall_norets_notrace(H_CEDE);
 	WARN_ON_ONCE(hvrc != H_SUCCESS);
+#ifdef CONFIG_TRACE_IRQFLAGS
+	/* Ensure that H_CEDE returns with IRQs on */
+	if (WARN_ON(!(mfmsr() & MSR_EE)))
+		__hard_irq_enable();
+#endif
 }
 
 static inline long vpa_call(unsigned long flags, unsigned long cpu,
