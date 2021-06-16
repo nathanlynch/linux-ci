@@ -77,14 +77,8 @@ static void check_and_cede_processor(void)
 	 * also checks if no interrupt has occurred while we
 	 * were soft-disabled
 	 */
-	if (prep_irq_for_idle()) {
+	if (prep_irq_for_idle())
 		cede_processor();
-#ifdef CONFIG_TRACE_IRQFLAGS
-		/* Ensure that H_CEDE returns with IRQs on */
-		if (WARN_ON(!(mfmsr() & MSR_EE)))
-			__hard_irq_enable();
-#endif
-	}
 }
 
 /*
