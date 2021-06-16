@@ -11,13 +11,16 @@
 #include <asm/paca.h>
 #include <asm/page.h>
 
-static inline long cede_processor(void)
+static inline void cede_processor(void)
 {
+	long hvrc;
+
 	/*
 	 * We cannot call tracepoints inside RCU idle regions which
 	 * means we must not trace H_CEDE.
 	 */
-	return plpar_hcall_norets_notrace(H_CEDE);
+	hvrc = plpar_hcall_norets_notrace(H_CEDE);
+	WARN_ON_ONCE(hvrc != H_SUCCESS);
 }
 
 static inline long vpa_call(unsigned long flags, unsigned long cpu,
