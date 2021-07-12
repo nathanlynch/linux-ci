@@ -18,6 +18,7 @@
 #include <asm/firmware.h>
 #include <asm/hvcall.h>
 #include <asm/io.h>
+#include <asm/pseries-suspend.h>
 #include <linux/byteorder/generic.h>
 
 #include <asm/rtas.h>
@@ -77,7 +78,7 @@ static u32 phys_coresperchip; /* Physical cores per chip */
  * Retrieve the number of sockets and chips per socket and cores per
  * chip details through the get-system-parameter rtas call.
  */
-void read_24x7_sys_info(void)
+static void read_24x7_sys_info(void)
 {
 	int call_status, len, ntypes;
 
@@ -1714,6 +1715,19 @@ static int hv_24x7_cpu_hotplug_init(void)
 			  ppc_hv_24x7_cpu_offline);
 }
 
+static int hv_24x7_suspend_handler(struct notifier_block *nb, unsigned long action, void *data)
+{
+	if (action == PSERIES_RESUMING)
+		read_24x7_sys_info();
+	return 0;
+}
+
+static struct pseries_suspend_handler hv_24x7_suspend_handler_block = {
+	.notifier_block = {
+		.notifier_call = hv_24x7_suspend_handler,
+	},
+};
+
 static int hv_24x7_init(void)
 {
 	int r;
@@ -1768,6 +1782,8 @@ static int hv_24x7_init(void)
 		return r;
 
 	read_24x7_sys_info();
+
+	pseries_register_suspend_handler(&hv_24x7_suspend_handler_block);
 
 	return 0;
 }

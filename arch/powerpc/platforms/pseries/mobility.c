@@ -366,11 +366,6 @@ void post_mobility_fixup(void)
 
 	/* Possibly switch to a new L1 flush type */
 	pseries_setup_security_mitigations();
-
-	/* Reinitialise system information for hv-24x7 */
-	read_24x7_sys_info();
-
-	return;
 }
 
 static int poll_vasi_state(u64 handle, unsigned long *res)
