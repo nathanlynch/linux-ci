@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/kobject.h>
 #include <linux/nmi.h>
+#include <linux/notifier.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/stat.h>
@@ -24,6 +25,7 @@
 #include <linux/stringify.h>
 
 #include <asm/machdep.h>
+#include <asm/pseries-suspend.h>
 #include <asm/rtas.h>
 #include "pseries.h"
 #include "../../kernel/cacheinfo.h"
@@ -666,6 +668,25 @@ static int pseries_suspend(u64 handle)
 	return ret;
 }
 
+static BLOCKING_NOTIFIER_HEAD(pseries_suspend_nh);
+
+void pseries_register_suspend_handler(struct pseries_suspend_handler *h)
+{
+	blocking_notifier_chain_register(&pseries_suspend_nh, &h->notifier_block);
+}
+EXPORT_SYMBOL_GPL(pseries_register_suspend_handler);
+
+void pseries_unregister_suspend_handler(struct pseries_suspend_handler *h)
+{
+	blocking_notifier_chain_unregister(&pseries_suspend_nh, &h->notifier_block);
+}
+EXPORT_SYMBOL_GPL(pseries_unregister_suspend_handler);
+
+static void pseries_run_suspend_handlers(enum pseries_suspend_state state)
+{
+	blocking_notifier_call_chain(&pseries_suspend_nh, state, NULL);
+}
+
 static int pseries_migrate_partition(u64 handle)
 {
 	int ret;
@@ -674,11 +695,15 @@ static int pseries_migrate_partition(u64 handle)
 	if (ret)
 		return ret;
 
+	pseries_run_suspend_handlers(PSERIES_SUSPENDING);
+
 	ret = pseries_suspend(handle);
 	if (ret == 0)
 		post_mobility_fixup();
 	else
 		pseries_cancel_migration(handle, ret);
+
+	pseries_run_suspend_handlers(PSERIES_RESUMING);
 
 	return ret;
 }
