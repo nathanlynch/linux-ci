@@ -334,6 +334,11 @@ void post_mobility_fixup(void)
 {
 	int rc;
 
+	/*
+	 * Activate the RTAS provided by the destination system before
+	 * performing device tree updates. Otherwise, unrecognized
+	 * changes could be discarded by the original RTAS.
+	 */
 	rtas_activate_firmware();
 
 	/*
