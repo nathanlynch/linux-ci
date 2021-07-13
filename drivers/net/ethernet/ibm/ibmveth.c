@@ -33,6 +33,7 @@
 #include <asm/vio.h>
 #include <asm/iommu.h>
 #include <asm/firmware.h>
+#include <asm/pseries-suspend.h>
 #include <net/tcp.h>
 #include <net/ip6_checksum.h>
 
@@ -483,6 +484,22 @@ retry:
 	return rc;
 }
 
+static int ibmveth_pseries_suspend_handler(struct notifier_block *nb,
+				       unsigned long action, void *data)
+{
+	if (action == PSERIES_RESUMING) {
+		struct pseries_suspend_handler *handler;
+		struct ibmveth_adapter *adapter;
+
+		handler = container_of(nb, struct pseries_suspend_handler,
+				       notifier_block);
+		adapter = container_of(handler, struct ibmveth_adapter,
+				       suspend_handler);
+		netdev_notify_peers(adapter->netdev);
+	}
+	return 0;
+}
+
 static int ibmveth_open(struct net_device *netdev)
 {
 	struct ibmveth_adapter *adapter = netdev_priv(netdev);
@@ -603,6 +620,13 @@ static int ibmveth_open(struct net_device *netdev)
 		goto out_free_irq;
 	}
 
+	adapter->suspend_handler = (typeof(adapter->suspend_handler)) {
+		.notifier_block = (struct notifier_block) {
+			.notifier_call = ibmveth_pseries_suspend_handler,
+		},
+	};
+	pseries_register_suspend_handler(&adapter->suspend_handler);
+
 	netdev_dbg(netdev, "initial replenish cycle\n");
 	ibmveth_interrupt(netdev->irq, netdev);
 
@@ -647,6 +671,8 @@ static int ibmveth_close(struct net_device *netdev)
 	int i;
 
 	netdev_dbg(netdev, "close starting\n");
+
+	pseries_unregister_suspend_handler(&adapter->suspend_handler);
 
 	napi_disable(&adapter->napi);
 
