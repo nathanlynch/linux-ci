@@ -664,6 +664,7 @@ static int pseries_suspend(u64 handle)
 }
 
 static BLOCKING_NOTIFIER_HEAD(pseries_suspend_nh);
+static DEFINE_MUTEX(pseries_suspend_lock);
 
 void pseries_register_suspend_handler(struct pseries_suspend_handler *h)
 {
@@ -690,6 +691,8 @@ static int pseries_migrate_partition(u64 handle)
 	if (ret)
 		return ret;
 
+	mutex_lock(&pseries_suspend_lock);
+
 	pseries_run_suspend_handlers(PSERIES_SUSPENDING);
 
 	ret = pseries_suspend(handle);
@@ -699,6 +702,8 @@ static int pseries_migrate_partition(u64 handle)
 		pseries_cancel_migration(handle, ret);
 
 	pseries_run_suspend_handlers(PSERIES_RESUMING);
+
+	mutex_unlock(&pseries_suspend_lock);
 
 	return ret;
 }
