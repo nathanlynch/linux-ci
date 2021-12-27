@@ -668,18 +668,23 @@ static DEFINE_MUTEX(pseries_suspend_lock);
 
 void pseries_register_suspend_handler(struct pseries_suspend_handler *h)
 {
+	mutex_lock(&pseries_suspend_lock);
 	blocking_notifier_chain_register(&pseries_suspend_nh, &h->notifier_block);
+	mutex_unlock(&pseries_suspend_lock);
 }
 EXPORT_SYMBOL_GPL(pseries_register_suspend_handler);
 
 void pseries_unregister_suspend_handler(struct pseries_suspend_handler *h)
 {
+	mutex_lock(&pseries_suspend_lock);
 	blocking_notifier_chain_unregister(&pseries_suspend_nh, &h->notifier_block);
+	mutex_unlock(&pseries_suspend_lock);
 }
 EXPORT_SYMBOL_GPL(pseries_unregister_suspend_handler);
 
 static void pseries_run_suspend_handlers(enum pseries_suspend_state state)
 {
+	lockdep_assert_held(&pseries_suspend_lock);
 	blocking_notifier_call_chain(&pseries_suspend_nh, state, NULL);
 }
 
