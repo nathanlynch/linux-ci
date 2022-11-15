@@ -43,12 +43,8 @@ static char wdrtas_expect_close;
 static int wdrtas_interval;
 
 #define WDRTAS_THERMAL_SENSOR		3
-static int wdrtas_token_get_sensor_state;
 #define WDRTAS_SURVEILLANCE_IND		9000
-static int wdrtas_token_set_indicator;
 #define WDRTAS_SP_SPI			28
-static int wdrtas_token_get_sp;
-static int wdrtas_token_event_scan;
 
 #define WDRTAS_DEFAULT_INTERVAL		300
 
@@ -77,7 +73,7 @@ static int wdrtas_set_interval(int interval)
 	/* rtas uses minutes */
 	interval = (interval + 59) / 60;
 
-	result = rtas_call(wdrtas_token_set_indicator, 3, 1, NULL,
+	result = rtas_call(rtas_function_token(RTAS_FN_SET_INDICATOR), 3, 1, NULL,
 			   WDRTAS_SURVEILLANCE_IND, 0, interval);
 	if (result < 0 && print_msg) {
 		pr_err("setting the watchdog to %i timeout failed: %li\n",
@@ -104,10 +100,11 @@ static int wdrtas_get_interval(int fallback_value)
 {
 	long result;
 	char value[WDRTAS_SP_SPI_LEN];
+	s32 token = rtas_function_token(RTAS_FN_IBM_GET_SYSTEM_PARAMETER);
 
 	spin_lock(&rtas_data_buf_lock);
 	memset(rtas_data_buf, 0, WDRTAS_SP_SPI_LEN);
-	result = rtas_call(wdrtas_token_get_sp, 3, 1, NULL,
+	result = rtas_call(token, 3, 1, NULL,
 			   WDRTAS_SP_SPI, __pa(rtas_data_buf),
 			   WDRTAS_SP_SPI_LEN);
 
@@ -155,10 +152,11 @@ static void wdrtas_timer_stop(void)
  */
 static void wdrtas_timer_keepalive(void)
 {
+	s32 token = rtas_function_token(RTAS_FN_EVENT_SCAN);
 	long result;
 
 	do {
-		result = rtas_call(wdrtas_token_event_scan, 4, 1, NULL,
+		result = rtas_call(token, 4, 1, NULL,
 				   RTAS_EVENT_SCAN_ALL_EVENTS, 0,
 				   (void *)__pa(wdrtas_logbuffer),
 				   WDRTAS_LOGBUFFER_LEN);
@@ -295,7 +293,7 @@ static long wdrtas_ioctl(struct file *file, unsigned int cmd,
 		return put_user(i, argp);
 
 	case WDIOC_GETTEMP:
-		if (wdrtas_token_get_sensor_state == RTAS_UNKNOWN_SERVICE)
+		if (!rtas_function_implemented(RTAS_FN_GET_SENSOR_STATE))
 			return -EOPNOTSUPP;
 
 		i = wdrtas_get_temperature();
@@ -328,7 +326,7 @@ static long wdrtas_ioctl(struct file *file, unsigned int cmd,
 
 		wdrtas_timer_keepalive();
 
-		if (wdrtas_token_get_sp == RTAS_UNKNOWN_SERVICE)
+		if (!rtas_function_implemented(RTAS_FN_IBM_GET_SYSTEM_PARAMETER))
 			wdrtas_interval = i;
 		else
 			wdrtas_interval = wdrtas_get_interval(i);
@@ -512,25 +510,21 @@ static struct notifier_block wdrtas_notifier = {
  */
 static int wdrtas_get_tokens(void)
 {
-	wdrtas_token_get_sensor_state = rtas_token("get-sensor-state");
-	if (wdrtas_token_get_sensor_state == RTAS_UNKNOWN_SERVICE) {
+	if (!rtas_function_implemented(RTAS_FN_GET_SENSOR_STATE)) {
 		pr_warn("couldn't get token for get-sensor-state. Trying to continue without temperature support.\n");
 	}
 
-	wdrtas_token_get_sp = rtas_token("ibm,get-system-parameter");
-	if (wdrtas_token_get_sp == RTAS_UNKNOWN_SERVICE) {
+	if (!rtas_function_implemented(RTAS_FN_IBM_GET_SYSTEM_PARAMETER)) {
 		pr_warn("couldn't get token for ibm,get-system-parameter. Trying to continue with a default timeout value of %i seconds.\n",
 			WDRTAS_DEFAULT_INTERVAL);
 	}
 
-	wdrtas_token_set_indicator = rtas_token("set-indicator");
-	if (wdrtas_token_set_indicator == RTAS_UNKNOWN_SERVICE) {
+	if (!rtas_function_implemented(RTAS_FN_SET_INDICATOR)) {
 		pr_err("couldn't get token for set-indicator. Terminating watchdog code.\n");
 		return -EIO;
 	}
 
-	wdrtas_token_event_scan = rtas_token("event-scan");
-	if (wdrtas_token_event_scan == RTAS_UNKNOWN_SERVICE) {
+	if (!rtas_function_implemented(RTAS_FN_EVENT_SCAN)) {
 		pr_err("couldn't get token for event-scan. Terminating watchdog code.\n");
 		return -EIO;
 	}
@@ -547,7 +541,7 @@ static int wdrtas_get_tokens(void)
 static void wdrtas_unregister_devs(void)
 {
 	misc_deregister(&wdrtas_miscdev);
-	if (wdrtas_token_get_sensor_state != RTAS_UNKNOWN_SERVICE)
+	if (rtas_function_implemented(RTAS_FN_GET_SENSOR_STATE))
 		misc_deregister(&wdrtas_tempdev);
 }
 
@@ -569,12 +563,10 @@ static int wdrtas_register_devs(void)
 		return result;
 	}
 
-	if (wdrtas_token_get_sensor_state != RTAS_UNKNOWN_SERVICE) {
+	if (rtas_function_implemented(RTAS_FN_GET_SENSOR_STATE)) {
 		result = misc_register(&wdrtas_tempdev);
-		if (result) {
+		if (result)
 			pr_warn("couldn't register watchdog temperature misc device. Continuing without temperature support.\n");
-			wdrtas_token_get_sensor_state = RTAS_UNKNOWN_SERVICE;
-		}
 	}
 
 	return 0;
@@ -601,7 +593,7 @@ static int __init wdrtas_init(void)
 		return -ENODEV;
 	}
 
-	if (wdrtas_token_get_sp == RTAS_UNKNOWN_SERVICE)
+	if (!rtas_function_implemented(RTAS_FN_IBM_GET_SYSTEM_PARAMETER))
 		wdrtas_interval = WDRTAS_DEFAULT_INTERVAL;
 	else
 		wdrtas_interval = wdrtas_get_interval(WDRTAS_DEFAULT_INTERVAL);
