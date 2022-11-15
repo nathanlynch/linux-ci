@@ -115,7 +115,7 @@ static int update_node(__be32 phandle, s32 scope)
 	u32 nprops;
 	u32 vd;
 
-	token = rtas_token("ibm,update-properties");
+	token = rtas_function_token(RTAS_FN_IBM_UPDATE_PROPERTIES);
 	if (token == RTAS_UNKNOWN_SERVICE)
 		return -EINVAL;
 
@@ -179,7 +179,7 @@ static int update_devicetree(struct cxl *adapter, s32 scope)
 	__be32 *data, phandle;
 	char *buf;
 
-	token = rtas_token("ibm,update-nodes");
+	token = rtas_function_token(RTAS_FN_IBM_UPDATE_NODES);
 	if (token == RTAS_UNKNOWN_SERVICE)
 		return -EINVAL;
 
