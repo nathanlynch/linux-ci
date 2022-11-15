@@ -454,7 +454,7 @@ exit:
 
 static inline int is_dlpar_capable(void)
 {
-	int rc = rtas_token("ibm,configure-connector");
+	int rc = rtas_function_token(RTAS_FN_IBM_CONFIGURE_CONNECTOR);
 
 	return (int) (rc != RTAS_UNKNOWN_SERVICE);
 }
