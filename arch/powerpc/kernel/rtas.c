@@ -487,10 +487,9 @@ static int rtas_function_cmp(const void *a, const void *b)
 
 /*
  * Boot-time initialization of the function table needs the lookup to
- * return a non-const-qualified object. Use rtas_name_to_function()
- * in all other contexts.
+ * return a non-const-qualified object.
  */
-static struct rtas_function *__rtas_name_to_function(const char *name)
+static struct rtas_function * __init __rtas_name_to_function(const char *name)
 {
 	const struct rtas_function key = {
 		.name = name,
@@ -501,11 +500,6 @@ static struct rtas_function *__rtas_name_to_function(const char *name)
 			sizeof(rtas_function_table[0]), rtas_function_cmp);
 
 	return found;
-}
-
-static const struct rtas_function *rtas_name_to_function(const char *name)
-{
-	return __rtas_name_to_function(name);
 }
 
 static DEFINE_XARRAY(rtas_token_to_function_xarray);
@@ -882,38 +876,6 @@ void rtas_progress(char *s, unsigned short hex)
 	spin_unlock(&progress_lock);
 }
 EXPORT_SYMBOL(rtas_progress);		/* needed by rtas_flash module */
-
-int rtas_token(const char *service)
-{
-	const struct rtas_function *func;
-	const __be32 *tokp;
-
-	if (rtas.dev == NULL)
-		return RTAS_UNKNOWN_SERVICE;
-
-	func = rtas_name_to_function(service);
-	if (func)
-		return func->token;
-	/*
-	 * The caller is looking up a name that is not known to be an
-	 * RTAS function. Either it's a function that needs to be
-	 * added to the table, or they're misusing rtas_token() to
-	 * access non-function properties of the /rtas node. Warn and
-	 * fall back to the legacy behavior.
-	 */
-	WARN_ONCE(1, "unknown function `%s`, should it be added to rtas_function_table?\n",
-		  service);
-
-	tokp = of_get_property(rtas.dev, service, NULL);
-	return tokp ? be32_to_cpu(*tokp) : RTAS_UNKNOWN_SERVICE;
-}
-EXPORT_SYMBOL(rtas_token);
-
-int rtas_service_present(const char *service)
-{
-	return rtas_token(service) != RTAS_UNKNOWN_SERVICE;
-}
-EXPORT_SYMBOL(rtas_service_present);
 
 #ifdef CONFIG_RTAS_ERROR_LOGGING
 
