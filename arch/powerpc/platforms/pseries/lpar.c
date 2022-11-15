@@ -1489,7 +1489,7 @@ void __init pseries_lpar_read_hblkrm_characteristics(void)
 
 	spin_lock(&rtas_data_buf_lock);
 	memset(rtas_data_buf, 0, RTAS_DATA_BUF_SIZE);
-	call_status = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
+	call_status = rtas_call(rtas_function_token(RTAS_FN_IBM_GET_SYSTEM_PARAMETER), 3, 1,
 				NULL,
 				SPLPAR_TLB_BIC_TOKEN,
 				__pa(rtas_data_buf),
