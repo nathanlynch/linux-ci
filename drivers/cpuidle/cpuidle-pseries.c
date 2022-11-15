@@ -169,7 +169,7 @@ static int __init parse_cede_parameters(void)
 	u16 payload_size;
 	int ret, i;
 
-	ret = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
+	ret = rtas_call(rtas_function_token(RTAS_FN_IBM_GET_SYSTEM_PARAMETER), 3, 1,
 			NULL, CEDE_LATENCY_TOKEN, __pa(&xcede_latency_parameter),
 			sizeof(xcede_latency_parameter));
 	if (ret) {
