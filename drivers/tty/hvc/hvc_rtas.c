@@ -68,12 +68,12 @@ static int __init hvc_rtas_init(void)
 	struct hvc_struct *hp;
 
 	if (rtascons_put_char_token == RTAS_UNKNOWN_SERVICE)
-		rtascons_put_char_token = rtas_token("put-term-char");
+		rtascons_put_char_token = rtas_function_token(RTAS_FN_PUT_TERM_CHAR);
 	if (rtascons_put_char_token == RTAS_UNKNOWN_SERVICE)
 		return -EIO;
 
 	if (rtascons_get_char_token == RTAS_UNKNOWN_SERVICE)
-		rtascons_get_char_token = rtas_token("get-term-char");
+		rtascons_get_char_token = rtas_function_token(RTAS_FN_GET_TERM_CHAR);
 	if (rtascons_get_char_token == RTAS_UNKNOWN_SERVICE)
 		return -EIO;
 
@@ -94,11 +94,11 @@ device_initcall(hvc_rtas_init);
 /* This will happen prior to module init.  There is no tty at this time? */
 static int __init hvc_rtas_console_init(void)
 {
-	rtascons_put_char_token = rtas_token("put-term-char");
+	rtascons_put_char_token = rtas_function_token(RTAS_FN_PUT_TERM_CHAR);
 	if (rtascons_put_char_token == RTAS_UNKNOWN_SERVICE)
 		return -EIO;
 
-	rtascons_get_char_token = rtas_token("get-term-char");
+	rtascons_get_char_token = rtas_function_token(RTAS_FN_GET_TERM_CHAR);
 	if (rtascons_get_char_token == RTAS_UNKNOWN_SERVICE)
 		return -EIO;
 
