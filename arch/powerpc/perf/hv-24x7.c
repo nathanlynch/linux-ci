@@ -91,7 +91,7 @@ void read_24x7_sys_info(void)
 	phys_chipspersocket = 1;
 	phys_coresperchip = 1;
 
-	call_status = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
+	call_status = rtas_call(rtas_function_token(RTAS_FN_IBM_GET_SYSTEM_PARAMETER), 3, 1,
 				NULL,
 				PROCESSOR_MODULE_INFO,
 				__pa(rtas_data_buf),
