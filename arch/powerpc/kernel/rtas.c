@@ -1042,6 +1042,13 @@ void rtas_call_unlocked(struct rtas_args *args, int token, int nargs, int nret, 
 {
 	va_list list;
 
+	/*
+	 * Callers must not use rtas_args; otherwise they risk
+	 * corrupting the state of the rtas_call() path, which is
+	 * serialized by rtas_lock.
+	 */
+	WARN_ON(args == &rtas_args);
+
 	va_start(list, nret);
 	va_rtas_call(args, token, nargs, nret, list);
 	va_end(list);
