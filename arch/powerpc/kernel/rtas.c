@@ -996,9 +996,8 @@ static void __init init_error_log_max(void) {}
 #endif
 
 
-static void
-va_rtas_call_unlocked(struct rtas_args *args, int token, int nargs, int nret,
-		      va_list list)
+static void va_rtas_call(struct rtas_args *args, int token, int nargs, int nret,
+			 va_list list)
 {
 	int i;
 
@@ -1038,7 +1037,7 @@ void rtas_call_unlocked(struct rtas_args *args, int token, int nargs, int nret, 
 	va_list list;
 
 	va_start(list, nret);
-	va_rtas_call_unlocked(args, token, nargs, nret, list);
+	va_rtas_call(args, token, nargs, nret, list);
 	va_end(list);
 }
 
@@ -1138,7 +1137,7 @@ int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 	args = &rtas_args;
 
 	va_start(list, outputs);
-	va_rtas_call_unlocked(args, token, nargs, nret, list);
+	va_rtas_call(args, token, nargs, nret, list);
 	va_end(list);
 
 	/* A -1 return code indicates that the last command couldn't
