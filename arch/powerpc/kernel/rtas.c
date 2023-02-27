@@ -1798,7 +1798,6 @@ err:
 /* We assume to be passed big endian arguments */
 SYSCALL_DEFINE1(rtas, struct rtas_args __user *, uargs)
 {
-	struct pin_cookie cookie;
 	struct rtas_args args;
 	unsigned long flags;
 	char *buff_copy, *errbuf = NULL;
@@ -1866,20 +1865,25 @@ SYSCALL_DEFINE1(rtas, struct rtas_args __user *, uargs)
 
 	buff_copy = get_errorlog_buffer();
 
-	raw_spin_lock_irqsave(&rtas_lock, flags);
-	cookie = lockdep_pin_lock(&rtas_lock);
+	do {
+		struct pin_cookie cookie;
 
-	rtas_args = args;
-	do_enter_rtas(&rtas_args);
-	args = rtas_args;
+		raw_spin_lock_irqsave(&rtas_lock, flags);
+		cookie = lockdep_pin_lock(&rtas_lock);
 
-	/* A -1 return code indicates that the last command couldn't
-	   be completed due to a hardware error. */
-	if (be32_to_cpu(args.rets[0]) == -1)
-		errbuf = __fetch_rtas_last_error(buff_copy);
+		rtas_args = args;
+		do_enter_rtas(&rtas_args);
+		args = rtas_args;
 
-	lockdep_unpin_lock(&rtas_lock, cookie);
-	raw_spin_unlock_irqrestore(&rtas_lock, flags);
+		/*
+		 * Handle error record retrieval before releasing the lock.
+		 */
+		if (be32_to_cpu(args.rets[0]) == -1)
+			errbuf = __fetch_rtas_last_error(buff_copy);
+
+		lockdep_unpin_lock(&rtas_lock, cookie);
+		raw_spin_unlock_irqrestore(&rtas_lock, flags);
+	} while (rtas_busy_delay(be32_to_cpu(args.rets[0])));
 
 	if (buff_copy) {
 		if (errbuf)
