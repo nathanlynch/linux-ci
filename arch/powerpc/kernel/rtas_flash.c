@@ -702,7 +702,7 @@ static int __init rtas_flash_init(void)
 	const unsigned int align = RTAS_BLK_SIZE;
 	const unsigned int usersize = objsize;
 	const unsigned int useroffset = 0;
-	const void (*ctor)(void *) = NULL;
+	void (* const ctor)(void *) = NULL;
 	const slab_flags_t flags = 0;
 	int i;
 
