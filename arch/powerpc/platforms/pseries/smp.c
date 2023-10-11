@@ -239,6 +239,78 @@ static __init void pSeries_smp_probe(void)
 	smp_ops->cause_ipi = dbell_or_ic_cause_ipi;
 }
 
+static void do_join(void *arg)
+{
+	cpumask_t *mask = arg;
+
+	cpumask_clear_cpu(smp_processor_id(), mask);
+
+	while (1) {
+		long hvrc;
+
+		hard_irq_disable();
+		hvrc = plpar_hcall_norets(H_JOIN);
+
+		switch (hvrc) {
+		case H_SUCCESS:
+			/*
+			 * The suspend is complete and this cpu has received a
+			 * prod, or we've received a stray prod from unrelated
+			 * code (e.g. paravirt spinlocks) and we need to join
+			 * again.
+			 *
+			 * This barrier orders the return from H_JOIN above vs
+			 * the load of info->done. It pairs with the barrier
+			 * in the wakeup/prod path below.
+			 */
+			smp_mb();
+			if (!cpumask_test_cpu(smp_processor_id(), mask)) {
+				pr_info_ratelimited("premature return from H_JOIN on CPU %i, retrying",
+						    smp_processor_id());
+				continue;
+			}
+			break;
+		case H_CONTINUE:
+		case H_BAD_MODE:
+		case H_HARDWARE:
+		default:
+			pr_err_ratelimited("Unexpected H_JOIN result %ld on CPU %i\n",
+					   hvrc, smp_processor_id());
+			break;
+		}
+
+		return;
+	}
+}
+
+static cpumask_var_t prod_mask;
+
+static int pseries_cpu_join(int cpu)
+{
+	cpumask_set_cpu(cpu, prod_mask);
+	smp_call_function_single(cpu, do_join, &prod_mask, 0);
+	while (cpumask_test_cpu(cpu, prod_mask))
+		cpu_relax();
+	return 0;
+}
+
+static int pseries_cpu_prod(int target_cpu)
+{
+	long hvrc;
+	int hwid;
+
+	hwid = get_hard_smp_processor_id(target_cpu);
+	cpumask_set_cpu(target_cpu, prod_mask);
+	smp_mb();
+	hvrc = plpar_hcall_norets(H_PROD, hwid);
+	if (hvrc == H_SUCCESS)
+		return 0;
+	pr_err_ratelimited("H_PROD of CPU %u (hwid %d) error: %ld\n",
+			   target_cpu, hwid, hvrc);
+
+	return -EIO;
+}
+
 static struct smp_ops_t pseries_smp_ops = {
 	.message_pass	= NULL,	/* Use smp_muxed_ipi_message_pass */
 	.cause_ipi	= NULL,	/* Filled at runtime by pSeries_smp_probe() */
@@ -248,6 +320,10 @@ static struct smp_ops_t pseries_smp_ops = {
 	.kick_cpu	= smp_pSeries_kick_cpu,
 	.setup_cpu	= smp_setup_cpu,
 	.cpu_bootable	= smp_generic_cpu_bootable,
+#ifdef CONFIG_PM_SLEEP_SMP
+	.freeze_secondary = pseries_cpu_join,
+	.thaw_secondary = pseries_cpu_prod,
+#endif
 };
 
 /* This is called very early */
