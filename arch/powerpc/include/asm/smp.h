@@ -59,6 +59,10 @@ struct smp_ops_t {
 #ifdef CONFIG_HOTPLUG_CPU
 	void  (*cpu_offline_self)(void);
 #endif
+#ifdef CONFIG_PM_SLEEP_SMP
+	int (*freeze_secondary)(int cpu);
+	int (*thaw_secondary)(int cpu);
+#endif
 };
 
 extern struct task_struct *secondary_current;
@@ -253,6 +257,20 @@ extern struct smp_ops_t *smp_ops;
 
 extern void arch_send_call_function_single_ipi(int cpu);
 extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+
+#define arch_freeze_secondary_cpu arch_freeze_secondary_cpu
+static inline int arch_freeze_secondary_cpu(int cpu)
+{
+	// fixme: this will of course crash on non-pseries
+	return smp_ops->freeze_secondary(cpu);
+}
+
+#define arch_thaw_secondary_cpu arch_thaw_secondary_cpu
+static inline int arch_thaw_secondary_cpu(int cpu)
+{
+	return smp_ops->thaw_secondary(cpu);
+}
+
 
 /* Definitions relative to the secondary CPU spin loop
  * and entry point. Not all of them exist on both 32 and
