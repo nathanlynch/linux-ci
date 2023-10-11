@@ -1907,6 +1907,14 @@ void __init bringup_nonboot_cpus(unsigned int setup_max_cpus)
 #ifdef CONFIG_PM_SLEEP_SMP
 static cpumask_var_t frozen_cpus;
 
+static int freeze_secondary(int cpu)
+{
+#ifndef arch_freeze_secondary_cpu
+#define arch_freeze_secondary_cpu(cpu) _cpu_down(cpu, 1, CPUHP_OFFLINE)
+#endif
+	return arch_freeze_secondary_cpu(cpu);
+}
+
 int freeze_secondary_cpus(int primary)
 {
 	int cpu, error = 0;
@@ -1939,7 +1947,7 @@ int freeze_secondary_cpus(int primary)
 		}
 
 		trace_suspend_resume(TPS("CPU_OFF"), cpu, true);
-		error = _cpu_down(cpu, 1, CPUHP_OFFLINE);
+		error = freeze_secondary(cpu);
 		trace_suspend_resume(TPS("CPU_OFF"), cpu, false);
 		if (!error)
 			cpumask_set_cpu(cpu, frozen_cpus);
@@ -1973,6 +1981,14 @@ void __weak arch_thaw_secondary_cpus_end(void)
 {
 }
 
+static int thaw_secondary(int cpu)
+{
+#ifndef arch_thaw_secondary_cpu
+#define arch_thaw_secondary_cpu(cpu) _cpu_up(cpu, 1, CPUHP_ONLINE);
+#endif
+	return arch_thaw_secondary_cpu(cpu);
+}
+
 void thaw_secondary_cpus(void)
 {
 	int cpu, error;
@@ -1989,7 +2005,7 @@ void thaw_secondary_cpus(void)
 
 	for_each_cpu(cpu, frozen_cpus) {
 		trace_suspend_resume(TPS("CPU_ON"), cpu, true);
-		error = _cpu_up(cpu, 1, CPUHP_ONLINE);
+		error = thaw_secondary(cpu);
 		trace_suspend_resume(TPS("CPU_ON"), cpu, false);
 		if (!error) {
 			pr_info("CPU%d is up\n", cpu);
