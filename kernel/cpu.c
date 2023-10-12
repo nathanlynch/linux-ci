@@ -1930,6 +1930,12 @@ int freeze_secondary_cpus(int primary)
 	}
 
 	/*
+	 * We're potentially going to IPI and synchronize with the
+	 * other CPUs, ensure we're running on the primary.
+	 */
+	set_cpus_allowed_ptr(current, cpumask_of(primary));
+
+	/*
 	 * We take down all of the non-boot CPUs in one shot to avoid races
 	 * with the userspace trying to use the CPU hotplug at the same time
 	 */
@@ -1957,9 +1963,7 @@ int freeze_secondary_cpus(int primary)
 		}
 	}
 
-	if (!error)
-		BUG_ON(num_online_cpus() > 1);
-	else
+	if (error)
 		pr_err("Non-boot CPUs are not disabled\n");
 
 	/*
@@ -2018,6 +2022,9 @@ void thaw_secondary_cpus(void)
 
 	cpumask_clear(frozen_cpus);
 out:
+	// FIXME this should be properly saved and restored in
+	// cooperation w/freeze_secondary_cpus()
+	set_cpus_allowed_ptr(current, cpu_online_mask);
 	cpu_maps_update_done();
 }
 
